@@ -1,0 +1,63 @@
+import numpy as np
+import pandas as pd
+
+def gaussian_on_canvas(canvas_size, mue=(10,10), sigma=(1,1)):    
+    # Parameters
+    mu_x, mu_y = mue  # Center of the distribution
+    sigma_x, sigma_y = sigma  # Standard deviations
+    size = 100  # Size of the 2D array
+    
+    # Create a grid of (x,y) coordinates
+    x = np.linspace(0, canvas_size[0], canvas_size[0])
+    y = np.linspace(0, canvas_size[1], canvas_size[1])
+    X, Y = np.meshgrid(x, y)
+    
+    # Gaussian function
+    canvas = (1/(2 * np.pi * sigma_x * sigma_y)) * np.exp(-((X - mu_x)**2 / (2 * sigma_x**2) + (Y - mu_y)**2 / (2 * sigma_y**2)))
+
+    return canvas
+
+def get_cell_centroids(img, df, frame_index):
+    mask_canvas = np.zeros(np.array(img).shape)[:, :, 0]
+    
+    for cell_id in df[df["frame"] == frame_index]["cellid"].tolist():
+    
+        row = df[df["frame"] == frame_index][df["cellid"] == cell_id]
+        a = row.a.values[0]
+        b = row.b.values[0]
+        c = row.c.values[0]
+        d = row.d.values[0]
+        a = int(a)
+        b = int(b)
+        c = int(c)
+        d = int(d)
+    
+        #img[b:b+d, a:a+c] = 255
+        try:
+            mask_canvas[b+(d//2), a+(c//2)] = cell_id
+        except:
+            print("mask canvas out of bounds, skipping this edge case")
+    return mask_canvas
+
+def get_centroid_map(mask_img):
+    gaussians = []
+    
+    for cell_id in np.unique(np.array(mask_img)):
+        
+        if cell_id == 0:
+            # Background
+            continue
+        
+        match_mask = np.array(mask_img) == cell_id
+    
+        # Find the indices where the array is True
+        y_indices, x_indices = np.where(match_mask)
+        
+        # Calculate the average of the indices
+        centroid_y = np.mean(y_indices)
+        centroid_x = np.mean(x_indices)
+    
+        #print(cell_id, centroid_y, centroid_x)
+        gaussians.append(gaussian_on_canvas(mask_img.shape, mue=(centroid_y, centroid_x), sigma=(40,40)))
+
+    return np.max(np.array(gaussians), axis=0).T
