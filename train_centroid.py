@@ -19,7 +19,7 @@ parser.add_argument('--lr', type=float)
 parser.add_argument('--bs', type=int)
 args = parser.parse_args()
 
-wandb.init(project='helalab4.5', mode='offline')
+wandb.init(project='helalab5.0', mode='offline')
 
 wandb.config = {
   "lr": args.lr,
@@ -110,10 +110,13 @@ for epoch in range(2500):
     val_losses = []
     with torch.no_grad():
         for X, y in tqdm(validation_dataloader):
-            X = X.moveaxis(3, 1)[:, :1]
-            y = y[:, None]
-            X = X.to(device)[:, :, :336, :464]
-            y = y.to(device)[:, :, :336, :464]
+            fixed_transformation = FixedTransform(min_angle=0, max_angle=359, crop_height=128, crop_width=128)
+            X = torch.permute(X, (0,3,2,1))
+            y = y[:, :, :, None]
+            y = torch.permute(y, (0,3,2,1))
+
+            X = fixed_transformation(X)
+            y = fixed_transformation(y)
             y_pred = model(X)
 
             loss = criterion(y_pred, y)
