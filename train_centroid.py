@@ -12,6 +12,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from evaluate_aogm import calculate_aogm
 from augmentation import FixedTransform
+from helpers import plot_sequence
 
 parser = argparse.ArgumentParser()
 
@@ -19,7 +20,7 @@ parser.add_argument('--lr', type=float)
 parser.add_argument('--bs', type=int)
 args = parser.parse_args()
 
-wandb.init(project='helalab4.5', mode='offline')
+wandb.init(project='helalab5.0', mode='offline')
 
 wandb.config = {
   "lr": args.lr,
@@ -51,9 +52,9 @@ step = 0
 for epoch in range(2500):
     train_losses = []
 
-    if epoch%250 == 0:
+    if True or epoch%250 == 0:
         print("Starting AOGM calculation!")
-        aogm = calculate_aogm(model, mode="full")
+        aogm = calculate_aogm(model, mode="first")
         wandb.log({"full_aogm": aogm}, step=step)
 
     for X, y in tqdm(train_dataloader):
@@ -95,6 +96,7 @@ for epoch in range(2500):
         step += 1
 
         wandb.log({"train_loss": loss.item(), "learning_rate": get_lr(optim)}, step=step)
+
         #scheduler.step(loss.item())
 
     fig, ax = plt.subplots(1,3)
@@ -105,7 +107,11 @@ for epoch in range(2500):
     plt.suptitle(f"Epoch {epoch}")
     wandb.log({"train_heatmap": wandb.Image(fig)}, step=step)
     plt.close(fig)
-
+    
+    print("tracking sequence 1")
+    imgpath = plot_sequence(model)
+    wandb.log({"tracking_sequence": wandb.Image(imgpath)}, step=step)
+    print("tracking sequence 2")
 
     val_losses = []
     with torch.no_grad():
