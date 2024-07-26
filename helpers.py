@@ -1,5 +1,39 @@
 import numpy as np
 import pandas as pd
+import os
+import networkx as nx
+import matplotlib.pyplot as plt
+from PIL import Image
+import math
+import uuid
+
+def plot_sequence(model):
+    datapath = "HeLa_dataset/test/Burst4_A2_1_VesselID-29_1-0/img1/"
+    frames = os.listdir(datapath)
+    frames = [x for x in frames if x.endswith(".tiff")]
+    frames = sorted(frames)
+    frames = [datapath + x for x in frames]
+
+    inframes = [Image.open(x) for x in frames]
+    g = model.forward_inference(inframes)
+
+    side = int(math.sqrt(len(frames))) + 1
+    fig, ax = plt.subplots(side, side, figsize=(50,50))
+
+    for idx, frame in enumerate(frames):
+        idx += 1
+        ax.flat[idx-1].imshow(Image.open(frame))
+
+    for n in g.nodes:
+        t = g.nodes[n]["t"]
+        x = g.nodes[n]["x"]
+        y = g.nodes[n]["y"]
+        ax.flat[t-1].scatter([x], [y])
+    
+    filename = "/tmp/" + str(uuid.uuid4()) + ".png"
+    plt.savefig(filename)
+    return filename
+
 
 def gaussian_on_canvas(canvas_size, mue=(10,10), sigma=(1,1)):    
     # Parameters
