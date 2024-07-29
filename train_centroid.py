@@ -20,7 +20,7 @@ parser.add_argument('--lr', type=float)
 parser.add_argument('--bs', type=int)
 args = parser.parse_args()
 
-wandb.init(project='helalab6.0', mode='offline')
+wandb.init(project='helalab7.0', mode='offline')
 
 wandb.config = {
   "lr": args.lr,
@@ -129,6 +129,7 @@ for epoch in range(2500):
 
             X = fixed_transformation(X)
             y = fixed_transformation(y)
+            X = X[:, :1]
             y_pred = model(X)
 
             loss = criterion(y_pred, y)
