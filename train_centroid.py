@@ -64,7 +64,7 @@ for epoch in range(2500):
 
     for X, y in tqdm(train_dataloader):
 
-        print("y shape before transform", y.shape)
+        #print("y shape before transform", y.shape)
         fixed_transformation = FixedTransform(min_angle=0, max_angle=359, crop_height=128, crop_width=128)
         X = torch.permute(X, (0,3,2,1))
         y = y[:, :, :, None]
@@ -78,20 +78,20 @@ for epoch in range(2500):
         optim.zero_grad()
 
         X = X[:, :1]
-        print(X.shape, y.shape)
+        #print(X.shape, y.shape)
         #X = X.moveaxis(3, 1)[:, :1]
         #y = y[:, None]
 
         #print(X.shape, y.shape)
         #X = X.to(device)[:, :, :336, :464]
         #y = y.to(device)[:, :, :336, :464]
-        print("X shape", X.shape)
-        print("y shape", y.shape)
+        #print("X shape", X.shape)
+        #print("y shape", y.shape)
         X = X.to(device)
         y = y.to(device)
         #print(X.shape, y.shape)
         y_pred = model(X)
-        print(y_pred.shape)
+        #print(y_pred.shape)
 
         loss = criterion(y_pred, y)
         loss.backward()
