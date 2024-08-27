@@ -1,7 +1,7 @@
 # helalab
 
 
-Training the simplest form of a HeLa tracking network. This repository takes a single frame and predicts
+Training the simplest form of a HeLa tracking network. This repository takes a single frame and predicts the centroid map (a 2d grid with gaussians around the centroid locations). During inference, the tracking graph DOES NOT include edges between the nodes.
 
 
 
