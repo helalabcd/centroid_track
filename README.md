@@ -17,3 +17,5 @@ sbatch -q7d train.sbatch
 // Evaluate the saved models in parallel
 python run_multi_eval.py (this will schedule one slurm job per saved model to evaluate aogm)
 ```
+
+After `run_milti_eval.py` is done, cd into models and get the aogm scores with `cat $(ls *.txt | sort -V)`
