@@ -10,7 +10,7 @@ import wandb
 import argparse
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from evaluate_aogm import calculate_aogm
+from evaluate_aogm import calculate_aogm, calculate_edit_distance
 from augmentation import FixedTransform
 from helpers import plot_sequence
 
@@ -49,18 +49,25 @@ from torch.utils.data import DataLoader
 train_dataloader = DataLoader(train_dataset, batch_size=wandb.config["bs"], shuffle=True)
 validation_dataloader = DataLoader(validation_dataset, batch_size=wandb.config["bs"], shuffle=True)
 step = 0
-for epoch in range(2500):
+for epoch in range(250000000):
     train_losses = []
 
-    if epoch%250 == 0:
+    if False and epoch%250 == 0:
         print("Starting AOGM calculation!")
-        aogm = calculate_aogm(model, mode="full")
-        wandb.log({"full_aogm": aogm}, step=step)
 
+        aogm = calculate_aogm(model, mode="first")
+        ed = calculate_edit_distance(model, mode="first")
+        wandb.log({"first_aogm": aogm}, step=step)
+        wandb.log({"first_ed": ed}, step=step)
+        print("First aogm", aogm)
+        print("first ed", ed)
         print("tracking sequence 1")
         imgpath = plot_sequence(model)
         wandb.log({"tracking_sequence": wandb.Image(imgpath)}, step=step)
         print("tracking sequence 2")
+    if epoch%100 == 0:
+        print("Saving model")
+        torch.save(model, f"models/{epoch}.pt")
 
     for X, y in tqdm(train_dataloader):
 
@@ -130,6 +137,8 @@ for epoch in range(2500):
             X = fixed_transformation(X)
             y = fixed_transformation(y)
             X = X[:, :1]
+            X = X.to(device)
+            y = y.to(device)
             y_pred = model(X)
 
             loss = criterion(y_pred, y)

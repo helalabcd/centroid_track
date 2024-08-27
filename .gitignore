@@ -1,2 +1,6 @@
 HeLa_dataset
 wandb
+*.out
+models/*
+CACHE
+__pycache__

@@ -117,6 +117,7 @@ class WrapUnet(UNet2d):
                 if (0 <= x <= xd.shape[0]) and (0 <= y <= xd.shape[1]):
                     #print(x,y)
                     attributes = {'t': idx, 'x': y, 'y': x}
+                    print(attributes)
                     graph.add_node(node_id, **attributes)
                     node_id += 1
 
