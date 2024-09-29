@@ -6,9 +6,10 @@ import torch_em
 from torch_em.model import UNet2d
 from wrapper import WrapUnet
 import torch
-import wandb
 import argparse
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+import os
+import re
 
 from evaluate_aogm import calculate_aogm, calculate_edit_distance
 from augmentation import FixedTransform
@@ -18,14 +19,13 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--lr', type=float)
 parser.add_argument('--bs', type=int)
+parser.add_argument('--eval_each_n_epochs', type=int, default=100)
 args = parser.parse_args()
 
-wandb.init(project='helalab7.0', mode='offline')
+from aim import Run
+from aim import Image
 
-wandb.config = {
-  "lr": args.lr,
-  "bs": args.bs
-}
+run = Run()
 
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
@@ -36,38 +36,58 @@ device = "cuda"
 train_dataset = HeLaCentroidDataset("HeLa_dataset/train")
 validation_dataset = HeLaCentroidDataset("HeLa_dataset/test")
 
-#model = UNet2d(in_channels=1, out_channels=1)
 model = WrapUnet(in_channels=1, out_channels=1)
 model.to(device)
 
-optim = torch.optim.Adam(model.parameters(), lr=wandb.config["lr"])
-#scheduler = ReduceLROnPlateau(optim, min_lr=4e-3, mode='min', factor=0.1, patience=5000, verbose=True)
+optim = torch.optim.Adam(model.parameters(), lr=args.lr)
 criterion = torch.nn.MSELoss()
 
 from torch.utils.data import DataLoader
 
-train_dataloader = DataLoader(train_dataset, batch_size=wandb.config["bs"], shuffle=True)
-validation_dataloader = DataLoader(validation_dataset, batch_size=wandb.config["bs"], shuffle=True)
+train_dataloader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True)
+validation_dataloader = DataLoader(validation_dataset, batch_size=args.bs, shuffle=True)
+
 step = 0
 for epoch in range(250000000):
     train_losses = []
 
-    if False and epoch%250 == 0:
-        print("Starting AOGM calculation!")
+    if epoch%args.eval_each_n_epochs == 0:
+        for fname in os.listdir("models"):
+            if not fname.endswith(".txt"):
+                continue
 
-        aogm = calculate_aogm(model, mode="first")
-        ed = calculate_edit_distance(model, mode="first")
-        wandb.log({"first_aogm": aogm}, step=step)
-        wandb.log({"first_ed": ed}, step=step)
-        print("First aogm", aogm)
-        print("first ed", ed)
-        print("tracking sequence 1")
-        imgpath = plot_sequence(model)
-        wandb.log({"tracking_sequence": wandb.Image(imgpath)}, step=step)
-        print("tracking sequence 2")
-    if epoch%100 == 0:
+            if not fname.startswith(run.hash):
+                continue
+            print("Reading", fname)
+            epoch = fname.split("_")
+            match = re.search(r'_(\d+)\.pt', fname)
+            if match:
+                epoch = int(match.group(1))
+            else:
+                epoch = -1
+            with open('models/' + fname, 'r') as file:
+                aogm_score = file.read().rstrip()
+            os.system(f"rm models/{fname}")
+            run.track(float(aogm_score), name='aogm_score', epoch=epoch)
+
         print("Saving model")
-        torch.save(model, f"models/{epoch}.pt")
+        torch.save(model, f"models/{run.hash}_{epoch}.pt")
+
+        content = f"""#! /bin/bash
+#SBATCH -c 6
+#SBATCH --mem 16G
+#SBATCH -p gpu
+#SBATCH -t 2880
+#SBATCH -G RTX5000:1
+source ~/.bashrc
+mamba activate torchem2
+wandb offline
+python run_multi_eval.py --model="""
+        content += f"models/{run.hash}_{epoch}.pt"
+        print(content, file=open(f"tmp_slurm.sbatch",'w'))
+        os.system("sbatch -q7d tmp_slurm.sbatch")
+
+
 
     for X, y in tqdm(train_dataloader):
 
@@ -80,35 +100,21 @@ for epoch in range(250000000):
         X = fixed_transformation(X)
         y = fixed_transformation(y)
 
-        #X = torch.permute(X, (0,3,2,1))
-        #y = torch.permute(y, (0,3,2,1))
         optim.zero_grad()
 
         X = X[:, :1]
-        #print(X.shape, y.shape)
-        #X = X.moveaxis(3, 1)[:, :1]
-        #y = y[:, None]
-
-        #print(X.shape, y.shape)
-        #X = X.to(device)[:, :, :336, :464]
-        #y = y.to(device)[:, :, :336, :464]
-        #print("X shape", X.shape)
-        #print("y shape", y.shape)
         X = X.to(device)
         y = y.to(device)
-        #print(X.shape, y.shape)
         y_pred = model(X)
-        #print(y_pred.shape)
 
         loss = criterion(y_pred, y)
         loss.backward()
-        #print(loss.item())
         train_losses.append(loss.item())
         optim.step()
         step += 1
 
-        wandb.log({"train_loss": loss.item(), "learning_rate": get_lr(optim)}, step=step)
-
+        run.track(loss.item(), name='train_loss', step=step, epoch=epoch)
+        run.track(get_lr(optim), name='learning_rate', step=step, epoch=epoch)
         #scheduler.step(loss.item())
 
     fig, ax = plt.subplots(1,3)
@@ -117,15 +123,11 @@ for epoch in range(250000000):
     ax.flat[2].imshow(y_pred[0].T.detach().cpu())
     #plt.savefig(f"epoch_{epoch}.png")
     plt.suptitle(f"Epoch {epoch}")
-    wandb.log({"train_heatmap": wandb.Image(fig)}, step=step)
+    #wandb.log({"train_heatmap": wandb.Image(fig)}, step=step)
+    run.track(Image(fig), step=step, epoch=epoch, name="train_heatmap")
     plt.close(fig)
     
-    """
-    print("tracking sequence 1")
-    imgpath = plot_sequence(model)
-    wandb.log({"tracking_sequence": wandb.Image(imgpath)}, step=step)
-    print("tracking sequence 2")
-    """
+
     val_losses = []
     with torch.no_grad():
         for X, y in tqdm(validation_dataloader):
@@ -143,12 +145,13 @@ for epoch in range(250000000):
 
             loss = criterion(y_pred, y)
             val_losses.append(loss.item())
-        wandb.log({"val_loss": sum(val_losses) / len(val_losses), "learning_rate": get_lr(optim)}, step=step)
+        #wandb.log({"val_loss": sum(val_losses) / len(val_losses), "learning_rate": get_lr(optim)}, step=step)
+        run.track(sum(val_losses) / len(val_losses), name='val_loss', step=step, epoch=epoch)
         fig, ax = plt.subplots(1,3)
         ax.flat[0].imshow(X[0].T.detach().cpu())
         ax.flat[1].imshow(y[0].T.detach().cpu())
         ax.flat[2].imshow(y_pred[0].T.detach().cpu())
         #plt.savefig(f"epoch_{epoch}.png")
         plt.suptitle(f"Epoch {epoch}")
-        wandb.log({"validation_heatmap": wandb.Image(fig)}, step=step)
+        run.track(Image(fig), step=step, epoch=epoch, name="validation_heatmap") 
         plt.close(fig)

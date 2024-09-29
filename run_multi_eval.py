@@ -1,6 +1,9 @@
 from datasets import HeLaCentroidDataset
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from aim import Run
+from aim import Image
+
 
 import torch_em
 from torch_em.model import UNet2d
@@ -14,7 +17,7 @@ from evaluate_aogm import calculate_aogm, calculate_edit_distance
 from augmentation import FixedTransform
 from helpers import plot_sequence
 import os
-
+import sys
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--model', type=str, default=None)
@@ -24,6 +27,9 @@ print(args.model)
 
 if args.model is None:
     for f in os.listdir("models"):
+        if not f.endswith(".pt"):
+            # not a model file
+            continue
         print(f)
         content = f"""#! /bin/bash
 #SBATCH -c 6
@@ -40,16 +46,20 @@ python run_multi_eval.py --model="""
         os.system("sbatch -q7d tmp_slurm.sbatch")
         
 
-    import sys
     sys.exit()
 device = "cuda"
 
+#aim_hash = args.model.split("_")[0]
+#aim_hash = aim_hash.split("/")[-1]
+#run = Run(aim_hash)
 
-model = torch.load(f"models/{args.model}")
+#print(run)
+
+model = torch.load(f"{args.model}")
 
 
 print(model)
 
-aogm = calculate_aogm(model, mode="full")
+aogm = calculate_aogm(model, mode="full", filename_prefix=args.model)
 
-print(aogm, file=open(f"models/{args.model}.txt",'w'))
+print(aogm, file=open(f"{args.model}.txt",'w'))

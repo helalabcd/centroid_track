@@ -92,6 +92,7 @@ def get_centroid_map(mask_img):
         centroid_x = np.mean(x_indices)
     
         #print(cell_id, centroid_y, centroid_x)
-        gaussians.append(gaussian_on_canvas(mask_img.shape, mue=(centroid_y, centroid_x), sigma=(40,40)))
+        gaussians.append(gaussian_on_canvas(mask_img.shape, mue=(centroid_y, centroid_x), sigma=(10,10)))
+
 
     return np.max(np.array(gaussians), axis=0).T

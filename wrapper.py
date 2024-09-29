@@ -20,6 +20,8 @@ import networkx as nx
 from tqdm import tqdm
 import numpy as np
 
+import uuid
+
 class WrapUnet(UNet2d):
     def __init__(self, *args, **kwargs):
         # Call the __init__ method of the UNet2d class
@@ -104,6 +106,10 @@ class WrapUnet(UNet2d):
             stack = torch.stack(canvi, axis=0)
 
             xd = torch.sum(stack, axis=0) / torch.count_nonzero(stack, axis=0)
+
+            plt.imshow(xd)
+            plt.savefig(f"tmp/{str(uuid.uuid4())}.png")
+            plt.close()
 
             _xd = expand(xd)
 
