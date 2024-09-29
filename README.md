@@ -19,3 +19,21 @@ python run_multi_eval.py (this will schedule one slurm job per saved model to ev
 ```
 
 After `run_milti_eval.py` is done, cd into models and get the aogm scores with `cat $(ls *.txt | sort -V)`
+
+
+## Results
+
+### v1.0.0
+It can be verified that learning the centroids take place:
+![image](https://github.com/user-attachments/assets/dc56484b-8551-47b0-b39e-81ffc926b39b)
+
+Average AOGM on the validation set decreases, until it hits a limit at ~500.
+![image](https://github.com/user-attachments/assets/dc6f35c0-cc8b-43ee-9bd2-cd1362df5774)
+
+Hypothesize this is due to the labels being too large, making the downstream evaluation task unable to tell them apart properly (they bleed into each other, the sharp borders between them in y are not learned in y_pred)
+-> This could maybe be fixed with smaller centroids
+
+Verify that the downstream task indeed has problems not with detecting the presence of cells, but rather with telling them apart properly. Notice how the top left corner is clear of any cells. Earlier during training, the model wrongly detects cells here. After 1400 epochs, the model is pretty clear about the fact that there are no cells in this area. The main issue seems to be telling the predicted cells apart.
+![image](https://github.com/user-attachments/assets/525d738e-625c-48eb-af96-324669c3f712)
+
+**Could detection (=> tracking) performance (as measured by aogm) be further improved with smaller centroids?**
