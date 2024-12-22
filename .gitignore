@@ -4,3 +4,4 @@ wandb
 models/*
 CACHE
 __pycache__
+*.pth

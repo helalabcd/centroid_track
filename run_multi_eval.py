@@ -60,6 +60,6 @@ model = torch.load(f"{args.model}")
 
 print(model)
 
-aogm = calculate_aogm(model, mode="full", filename_prefix=args.model)
+aogm = calculate_aogm(model, mode="first", filename_prefix=args.model)
 
 print(aogm, file=open(f"{args.model}.txt",'w'))

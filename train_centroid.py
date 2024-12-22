@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 
 import torch_em
 from torch_em.model import UNet2d
-from wrapper import WrapUnet
 import torch
+from unetr_wrapper import WrapUnetr
+from unet_wrapper import WrapUnet
 import argparse
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import os
@@ -14,18 +15,28 @@ import re
 from evaluate_aogm import calculate_aogm, calculate_edit_distance
 from augmentation import FixedTransform
 from helpers import plot_sequence
+import uuid
 
 parser = argparse.ArgumentParser()
 
+os.system("mkdir models && mkdir tmp && mkdir plotting && mkdir plotting/models")
 parser.add_argument('--lr', type=float)
 parser.add_argument('--bs', type=int)
-parser.add_argument('--eval_each_n_epochs', type=int, default=100)
+parser.add_argument('--eval_each_n_epochs', type=int, default=25)
+parser.add_argument('--img_size', type=int, default=128)
+parser.add_argument('--load_checkpoint', type=str, default=None)
+parser.add_argument('--model_type', type=str, default="UNETR")
+
 args = parser.parse_args()
 
 from aim import Run
 from aim import Image
 
+# Initialized run and store command line parameters
 run = Run()
+for key, value in vars(args).items():
+    run.add_tag(f'{key}={value}')
+
 
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
@@ -33,10 +44,21 @@ def get_lr(optimizer):
 
 device = "cuda"
 
-train_dataset = HeLaCentroidDataset("HeLa_dataset/train")
-validation_dataset = HeLaCentroidDataset("HeLa_dataset/test")
+train_dataset = HeLaCentroidDataset("../../datasets/HeLa_dataset/train")
+validation_dataset = HeLaCentroidDataset("../../datasets/HeLa_dataset/test")
 
-model = WrapUnet(in_channels=1, out_channels=1)
+if args.model_type == "UNETR":
+    model = WrapUnetr(out_channels=1, img_size=args.img_size, backbone="mae", encoder="vit_l")
+    if args.load_checkpoint is not None:
+        print("Loading weights from", args.load_checkpoint)
+        model._load_encoder_from_checkpoint("mae", None, args.load_checkpoint)
+    else:
+        print("No weight init")
+elif args.model_type == "UNET":
+    model = WrapUnet(in_channels=1, out_channels=1)
+    if args.load_checkpoint is not None:
+        assert False, "You are trying to load a checkpoint for a UNET model. While this is not impossible, it is probably not what you want to do. Uncomment this to circumvent"
+
 model.to(device)
 
 optim = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -59,23 +81,23 @@ for epoch in range(250000000):
             if not fname.startswith(run.hash):
                 continue
             print("Reading", fname)
-            epoch = fname.split("_")
+            _epoch = fname.split("_")
             match = re.search(r'_(\d+)\.pt', fname)
             if match:
-                epoch = int(match.group(1))
+                _epoch = int(match.group(1))
             else:
-                epoch = -1
+                _epoch = -1
             with open('models/' + fname, 'r') as file:
                 aogm_score = file.read().rstrip()
             os.system(f"rm models/{fname}")
-            run.track(float(aogm_score), name='aogm_score', epoch=epoch)
-
+            run.track(float(aogm_score), name='aogm_score', step=epoch*len(train_dataloader), epoch=epoch)
+        
         print("Saving model")
         torch.save(model, f"models/{run.hash}_{epoch}.pt")
 
         content = f"""#! /bin/bash
 #SBATCH -c 6
-#SBATCH --mem 16G
+#SBATCH --mem 32G
 #SBATCH -p gpu
 #SBATCH -t 2880
 #SBATCH -G RTX5000:1
@@ -84,15 +106,16 @@ mamba activate torchem2
 wandb offline
 python run_multi_eval.py --model="""
         content += f"models/{run.hash}_{epoch}.pt"
-        print(content, file=open(f"tmp_slurm.sbatch",'w'))
-        os.system("sbatch -q7d tmp_slurm.sbatch")
-
+        _uuid = str(uuid.uuid4())
+        print(content, file=open(f"ev-{_uuid}.sbatch",'w'))
+        os.system(f"sbatch -q7d ev-{_uuid}.sbatch")
+        os.system(f"mv ev-{_uuid}.sbatch /tmp/")
 
 
     for X, y in tqdm(train_dataloader):
 
         #print("y shape before transform", y.shape)
-        fixed_transformation = FixedTransform(min_angle=0, max_angle=359, crop_height=128, crop_width=128)
+        fixed_transformation = FixedTransform(min_angle=0, max_angle=359, crop_height=args.img_size, crop_width=args.img_size)
         X = torch.permute(X, (0,3,2,1))
         y = y[:, :, :, None]
         y = torch.permute(y, (0,3,2,1))

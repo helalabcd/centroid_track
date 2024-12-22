@@ -8,4 +8,3 @@ source ~/.bashrc
 mamba activate torchem2
 wandb offline
 python train_centroid.py --lr=3e-4 --bs=16
-

@@ -3,7 +3,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 import torch_em
-from torch_em.model import UNet2d
+from torch_em.model import UNet2d, UNETR
 import torch
 import wandb
 import argparse
@@ -22,10 +22,10 @@ import numpy as np
 
 import uuid
 
-class WrapUnet(UNet2d):
+class WrapUnetr(UNETR):
     def __init__(self, *args, **kwargs):
         # Call the __init__ method of the UNet2d class
-        super(WrapUnet, self).__init__(*args, **kwargs)
+        super(WrapUnetr, self).__init__(*args, **kwargs)
 
 
     def configure_inference(self):
@@ -71,7 +71,7 @@ class WrapUnet(UNet2d):
                     #print("missing the last ", arr.shape[1] % shift_size)
 
                     crop = arr[ix*shift_size:ix*shift_size+crop_size, iy*shift_size:iy*shift_size+crop_size]
-                    if crop.shape != (128,128,3):
+                    if crop.shape != (crop_size,crop_size,3):
                         #print("First pass shape mismatch, continuing", crop.shape)
                         continue
 
@@ -91,7 +91,7 @@ class WrapUnet(UNet2d):
                     y_shift = arr.shape[1] % shift_size
 
                     crop = arr[ix*shift_size + x_shift:ix*shift_size+crop_size+x_shift, iy*shift_size + y_shift:iy*shift_size+crop_size+y_shift]
-                    if crop.shape != (128,128,3):
+                    if crop.shape != (crop_size,crop_size,3):
                         #print("First pass shape mismatch, continuing", crop.shape)
                         continue
 
