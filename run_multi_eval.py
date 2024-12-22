@@ -7,7 +7,7 @@ from aim import Image
 
 import torch_em
 from torch_em.model import UNet2d
-from wrapper import WrapUnet
+from unetr_wrapper import WrapUnetr
 import torch
 import wandb
 import argparse
