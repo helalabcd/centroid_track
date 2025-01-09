@@ -21,6 +21,7 @@ import sys
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--model', type=str, default=None)
+parser.add_argument('--eval_mode', type=str, default="first")
 args = parser.parse_args()
 
 print(args.model)
@@ -59,7 +60,7 @@ model = torch.load(f"{args.model}")
 
 
 print(model)
-
-aogm = calculate_aogm(model, mode="first", filename_prefix=args.model)
+print("Calculating aogm in mode ", args.eval_mode)
+aogm = calculate_aogm(model, mode=args.eval_mode, filename_prefix=args.model)
 
 print(aogm, file=open(f"{args.model}.txt",'w'))

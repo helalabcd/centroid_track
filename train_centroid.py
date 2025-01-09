@@ -26,6 +26,8 @@ parser.add_argument('--eval_each_n_epochs', type=int, default=25)
 parser.add_argument('--img_size', type=int, default=128)
 parser.add_argument('--load_checkpoint', type=str, default=None)
 parser.add_argument('--model_type', type=str, default="UNETR")
+parser.add_argument('--experiment', type=str, default=None)
+parser.add_argument('--eval_mode', type=str, default="first")
 
 args = parser.parse_args()
 
@@ -33,7 +35,7 @@ from aim import Run
 from aim import Image
 
 # Initialized run and store command line parameters
-run = Run()
+run = Run(experiment=args.experiment)
 for key, value in vars(args).items():
     run.add_tag(f'{key}={value}')
 
@@ -90,7 +92,7 @@ for epoch in range(250000000):
             with open('models/' + fname, 'r') as file:
                 aogm_score = file.read().rstrip()
             os.system(f"rm models/{fname}")
-            run.track(float(aogm_score), name='aogm_score', step=epoch*len(train_dataloader), epoch=epoch)
+            run.track(float(aogm_score), name='aogm_score', step=_epoch*len(train_dataloader), epoch=_epoch)
         
         print("Saving model")
         torch.save(model, f"models/{run.hash}_{epoch}.pt")
@@ -106,6 +108,7 @@ mamba activate torchem2
 wandb offline
 python run_multi_eval.py --model="""
         content += f"models/{run.hash}_{epoch}.pt"
+        content += f" --eval_mode={args.eval_mode}"
         _uuid = str(uuid.uuid4())
         print(content, file=open(f"ev-{_uuid}.sbatch",'w'))
         os.system(f"sbatch -q7d ev-{_uuid}.sbatch")
