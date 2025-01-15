@@ -24,6 +24,8 @@ parser.add_argument('--model', type=str, default=None)
 parser.add_argument('--eval_mode', type=str, default="first")
 args = parser.parse_args()
 
+HELAPATH = os.getenv('helapath')
+
 print(args.model)
 
 if args.model is None:
@@ -61,6 +63,8 @@ model = torch.load(f"{args.model}")
 
 print(model)
 print("Calculating aogm in mode ", args.eval_mode)
-aogm = calculate_aogm(model, mode=args.eval_mode, filename_prefix=args.model)
+aogm_dict = calculate_aogm(model, mode=args.eval_mode, filename_prefix=args.model)
 
-print(aogm, file=open(f"{args.model}.txt",'w'))
+for burst, aogm in aogm_dict.items():
+    print(aogm, file=open(f"{args.model}-{burst}.txt",'w'))
+

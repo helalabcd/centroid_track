@@ -7,8 +7,11 @@ from PIL import Image
 import math
 import uuid
 
+HELAPATH = os.getenv('helapath')
+
 def plot_sequence(model):
-    datapath = "HeLa_dataset/test/Burst4_A2_1_VesselID-29_1-0/img1/"
+    #datapath = "HeLa_dataset/test/Burst4_A2_1_VesselID-29_1-0/img1/"
+    datapath = os.path.join(HELAPATH, "test/Burst4_A2_1_VesselID-29_1-0/img1/")
     frames = os.listdir(datapath)
     frames = [x for x in frames if x.endswith(".tiff")]
     frames = sorted(frames)

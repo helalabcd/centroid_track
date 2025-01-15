@@ -28,8 +28,11 @@ parser.add_argument('--load_checkpoint', type=str, default=None)
 parser.add_argument('--model_type', type=str, default="UNETR")
 parser.add_argument('--experiment', type=str, default=None)
 parser.add_argument('--eval_mode', type=str, default="first")
+parser.add_argument('--loss', type=str, default="mse")
 
 args = parser.parse_args()
+
+HELAPATH = os.getenv('helapath')
 
 from aim import Run
 from aim import Image
@@ -46,8 +49,8 @@ def get_lr(optimizer):
 
 device = "cuda"
 
-train_dataset = HeLaCentroidDataset("../../datasets/HeLa_dataset/train")
-validation_dataset = HeLaCentroidDataset("../../datasets/HeLa_dataset/test")
+train_dataset = HeLaCentroidDataset(str(os.path.join(HELAPATH, "train")))
+validation_dataset = HeLaCentroidDataset(str(os.path.join(HELAPATH, "test")))
 
 if args.model_type == "UNETR":
     model = WrapUnetr(out_channels=1, img_size=args.img_size, backbone="mae", encoder="vit_l")
@@ -64,7 +67,13 @@ elif args.model_type == "UNET":
 model.to(device)
 
 optim = torch.optim.Adam(model.parameters(), lr=args.lr)
-criterion = torch.nn.MSELoss()
+
+if "mse" == loss:
+    print("Using mse loss")
+    criterion = torch.nn.MSELoss()
+if "l1" == loss:
+    print("Using l1 loss")
+    criterion = torch.nn.L1Loss()
 
 from torch.utils.data import DataLoader
 

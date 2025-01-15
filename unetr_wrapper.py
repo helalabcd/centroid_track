@@ -20,6 +20,9 @@ import networkx as nx
 from tqdm import tqdm
 import numpy as np
 
+from skimage.color import rgb2gray
+from skimage.feature import blob_log
+
 import uuid
 
 class WrapUnetr(UNETR):
@@ -107,24 +110,49 @@ class WrapUnetr(UNETR):
 
             xd = torch.sum(stack, axis=0) / torch.count_nonzero(stack, axis=0)
 
+            np_array = xd.detach().cpu().numpy()
+
+            # Save to a .npy file
+            np.save(f"tmp/{str(uuid.uuid4())}.npy", np_array)
+
             plt.imshow(xd)
             plt.savefig(f"tmp/{str(uuid.uuid4())}.png")
             plt.close()
 
+            """ old
             _xd = expand(xd)
-
             image_max = ndi.maximum_filter(_xd, size=20, mode='constant')
             coordinates = peak_local_max(image_max, min_distance=30)
             #print("Coordinates shape", coordinates.shape)
-
             coordinates = coordinates - xd.shape
+            """
 
-            for x,y in coordinates:
-                if (0 <= x <= xd.shape[0]) and (0 <= y <= xd.shape[1]):
-                    #print(x,y)
+            expanded_img = expand(xd)
+            image = torch.nan_to_num(torch.stack([expanded_img,expanded_img,expanded_img], axis=2))
+            image_gray = rgb2gray(image)
+            image_gray = image_gray / image_gray.max()
+
+            blobs_log = blob_log(image_gray, max_sigma=10, num_sigma=10, overlap=0.1)
+            coordinates = blobs_log[:, :2].astype(int)
+
+            for x, y in coordinates:
+                xmax, ymax = xd.shape
+        
+                x = x-xmax
+                y = y-ymax
+    
+                if (0 <= x <= xmax) and (0 <= y <= ymax):
                     attributes = {'t': idx, 'x': y, 'y': x}
-                    print(attributes)
                     graph.add_node(node_id, **attributes)
                     node_id += 1
 
+            """
+            for x,y in coordinates:
+                if (0 <= x <= xd.shape[0]) and (0 <= y <= xd.shape[1]):
+                    #print(x,y)
+                    attributes = {'t': idx, 'x': x, 'y': y}
+                    print(attributes)
+                    graph.add_node(node_id, **attributes)
+                    node_id += 1
+            """
         return graph
