@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
 from tqdm import tqdm
+import random
 
 from torch.utils.data import Dataset
 import os
@@ -18,9 +19,17 @@ warnings.filterwarnings("ignore")
 
 class HeLaCentroidDataset(Dataset):
 
-    def __init__(self, base_path):
-        
+    def __init__(self, base_path, simulate_smaller_dataset=None):
+        # simulate_smaller_dataset must be integer between 0 and 1, indicating percentage value
+
         self.bursts = os.listdir(base_path)
+        random.shuffle(self.bursts)
+
+        if simulate_smaller_dataset is not None:
+            limit = int(len(self.bursts) * simulate_smaller_dataset)
+            self.bursts = self.bursts[:limit]
+            print(f"DATASET: SIMULATING SMALLER DATASET WITH size {simulate_smaller_dataset}")
+        print(f"DATASET: NUMBER OF BURSTS IN USE: {len(self.bursts)}")
 
         self.cached_bursts = []
         self.burst_start_index = []

@@ -34,6 +34,10 @@ device = "cuda"
 aim_hash = args.model.split("_")[0]
 aim_hash = aim_hash.split("/")[-1]
 print("Aim hash", aim_hash)
+
+os.system(f"rm /mnt/lustre-grete/usr/u14148/centroid_track/.aim/locks/{aim_hash}.softlock")
+
+
 run = Run(aim_hash)
 
 print("Loaded run", run)
@@ -45,6 +49,10 @@ sorted_models = sorted(models, key=lambda x: int(x.split('_')[-1].split('.')[0])
 for modelname in sorted_models:
     print(modelname)
 
+    if os.path.exists(f"models_done/{modelname}.DONE"):
+        print("This model has already been evaluated, continuing")
+        continue
+
     model = torch.load(f"models/{modelname}")
     model = torch.compile(model)
     
@@ -53,9 +61,9 @@ for modelname in sorted_models:
     epoch = int(epoch)
 
     # TEMPORARY HACK! TMP
-    if epoch < 76:
-        print("Epoch too small, continuing!")
-        continue
+    #if epoch < 76:
+    #    print("Epoch too small, continuing!")
+    #    continue
 
     print(model)
     print("Calculating aogm in mode ", args.eval_mode)
@@ -64,7 +72,7 @@ for modelname in sorted_models:
     for burst, aogm in aogm_dict.items():
         #print(aogm, file=open(f"{args.model}-{burst}.txt",'w'))
         print(burst, aogm)
-        run.track(float(aogm), name=f'NEW_aogm_{burst}', epoch=epoch)
+        run.track(float(aogm), name=f'actual_aogm_{burst}', epoch=epoch, step=epoch*466)
 
     with open(f"models_done/{modelname}.DONE",'w') as file:
         pass

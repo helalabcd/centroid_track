@@ -22,15 +22,22 @@ parser = argparse.ArgumentParser()
 os.system("mkdir models && mkdir tmp && mkdir plotting && mkdir plotting/models")
 parser.add_argument('--lr', type=float)
 parser.add_argument('--bs', type=int)
-parser.add_argument('--eval_each_n_epochs', type=int, default=25)
+parser.add_argument('--epochs', type=int, default=1000)
 parser.add_argument('--img_size', type=int, default=128)
+parser.add_argument('--eval_each_n_epochs', type=int, default=25)
+parser.add_argument('--eval_each_n_epochs_after_150_epochs', type=int, default=100)
 parser.add_argument('--load_checkpoint', type=str, default=None)
 parser.add_argument('--model_type', type=str, default="UNETR")
 parser.add_argument('--experiment', type=str, default=None)
 parser.add_argument('--eval_mode', type=str, default="first")
 parser.add_argument('--loss', type=str, default="mse")
+parser.add_argument('--simulate_smaller_dataset', type=float, default=None)
+parser.add_argument('--freeze_encoder', type=bool, default=False)
 
 args = parser.parse_args()
+
+print("FREEZE ENCODER", args.freeze_encoder)
+
 
 HELAPATH = os.getenv('helapath')
 
@@ -41,7 +48,7 @@ from aim import Image
 run = Run(experiment=args.experiment)
 for key, value in vars(args).items():
     run.add_tag(f'{key}={value}')
-
+    run[key] = value
 
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
@@ -49,7 +56,7 @@ def get_lr(optimizer):
 
 device = "cuda"
 
-train_dataset = HeLaCentroidDataset(str(os.path.join(HELAPATH, "train")))
+train_dataset = HeLaCentroidDataset(str(os.path.join(HELAPATH, "train")), args.simulate_smaller_dataset)
 validation_dataset = HeLaCentroidDataset(str(os.path.join(HELAPATH, "test")))
 
 if args.model_type == "UNETR":
@@ -59,6 +66,13 @@ if args.model_type == "UNETR":
         model._load_encoder_from_checkpoint("mae", None, args.load_checkpoint)
     else:
         print("No weight init")
+
+    if args.freeze_encoder:
+        print("FREEZING ENCODER!")
+        for param in model.encoder.parameters():
+            param.requires_grad = False
+        print("Encoder weights were frozen")
+
 elif args.model_type == "UNET":
     model = WrapUnet(in_channels=1, out_channels=1)
     if args.load_checkpoint is not None:
@@ -68,10 +82,10 @@ model.to(device)
 
 optim = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-if "mse" == loss:
+if "mse" == args.loss:
     print("Using mse loss")
     criterion = torch.nn.MSELoss()
-if "l1" == loss:
+if "l1" == args.loss:
     print("Using l1 loss")
     criterion = torch.nn.L1Loss()
 
@@ -81,10 +95,16 @@ train_dataloader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True)
 validation_dataloader = DataLoader(validation_dataset, batch_size=args.bs, shuffle=True)
 
 step = 0
-for epoch in range(250000000):
+for epoch in range(args.epochs):
     train_losses = []
 
-    if epoch%args.eval_each_n_epochs == 0:
+    if epoch > 150:
+        eval_each = args.eval_each_n_epochs_after_150_epochs
+    else:
+        eval_each = args.eval_each_n_epochs
+
+    if epoch%eval_each == 0:
+        model.eval()
         for fname in os.listdir("models"):
             if not fname.endswith(".txt"):
                 continue
@@ -123,7 +143,7 @@ python run_multi_eval.py --model="""
         os.system(f"sbatch -q7d ev-{_uuid}.sbatch")
         os.system(f"mv ev-{_uuid}.sbatch /tmp/")
 
-
+    model.train()
     for X, y in tqdm(train_dataloader):
 
         #print("y shape before transform", y.shape)
@@ -162,7 +182,7 @@ python run_multi_eval.py --model="""
     run.track(Image(fig), step=step, epoch=epoch, name="train_heatmap")
     plt.close(fig)
     
-
+    model.eval()
     val_losses = []
     with torch.no_grad():
         for X, y in tqdm(validation_dataloader):

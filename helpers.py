@@ -52,7 +52,7 @@ def gaussian_on_canvas(canvas_size, mue=(10,10), sigma=(1,1)):
     # Gaussian function
     canvas = (1/(2 * np.pi * sigma_x * sigma_y)) * np.exp(-((X - mu_x)**2 / (2 * sigma_x**2) + (Y - mu_y)**2 / (2 * sigma_y**2)))
 
-    return canvas
+    return canvas / canvas.max()
 
 def get_cell_centroids(img, df, frame_index):
     mask_canvas = np.zeros(np.array(img).shape)[:, :, 0]
